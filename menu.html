@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Mis Tareas</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="overlay" id="globalOverlay"><div class="neo-overlay"></div></div>
+
+  <header class="header">
+    <div class="title">
+      <button id="menu-btn" class="menu-btn" aria-label="Abrir menú">☰</button>
+      <h1>Mis Tareas</h1>
+    </div>
+    <p id="fecha" aria-live="polite"></p>
+  </header>
+
+  <nav id="side-menu" class="side-menu" aria-label="Menú lateral">
+    <div class="user-details">
+      <p id="user-name"></p>
+      <p id="user-email"></p>
+    </div>
+    <ul>
+      <li><a href="#">Mis Tareas</a></li>
+      <li><a href="#">Tareas Rechazadas</a></li>
+      <li><a href="#">Mapa de Tareas</a></li>
+      <li><a href="#">Historial</a></li>
+      <li><a href="#">Dashboard</a></li>
+    </ul>
+    <hr>
+    <ul>
+      <li><a href="#">Cambiar de Equipo</a></li>
+      <li><a href="#">Ajustes</a></li>
+    </ul>
+    <hr>
+    <button id="logout-btn" class="btn btn-danger logout-btn">Cerrar Sesión</button>
+  </nav>
+
+  <main>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="pendientes">Pendientes</button>
+      <button class="tab-btn" data-tab="iniciados">Iniciados</button>
+      <button class="tab-btn" data-tab="completados">Completados</button>
+    </div>
+
+    <section id="pendientes" class="tab-content active">
+      <h2>Pendientes</h2>
+      <p>Tu ubicación actual en el mapa:</p>
+      <div id="map"></div>
+    </section>
+
+    <section id="iniciados" class="tab-content">
+      <h2>Tareas Iniciadas</h2>
+      <!-- tarjetas dinámicas aquí -->
+    </section>
+
+    <section id="completados" class="tab-content">
+      <h2>Tareas Completadas</h2>
+      <div id="completados-container"></div>
+    </section>
+
+    <div class="fab-container">
+      <button class="fab" id="main-fab" aria-label="Abrir acciones">⋮</button>
+      <div class="fab-options" id="fab-options">
+        <button class="fab" id="add-fab" aria-label="Nueva tarea">＋</button>
+      </div>
+    </div>
+
+    <!-- Modal simple usando el overlay global -->
+    <div id="modal" class="overlay" aria-hidden="true">
+      <div class="neo-overlay"></div>
+      <div class="card" style="position:fixed; inset:auto 12px 12px 12px; max-width:640px; margin:0 auto; padding:18px; z-index:1001;">
+        <button class="btn btn-ghost" id="close-modal" style="float:right">✕</button>
+        <h1 style="margin-top:0">Formulario</h1>
+        <p>Selecciona un formulario para comenzar la tarea.</p>
+        <div class="modal-options" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <button class="btn" data-tipo="Unidades Armadas">UNIDADES ARMADAS</button>
+          <button class="btn" data-tipo="Encuesta de Satisfacción">ENCUESTA DE SATISFACCIÓN</button>
+          <button class="btn" data-tipo="Ronda de la Unidad">RONDA DE LA UNIDAD</button>
+          <button class="btn" data-tipo="Formulario Dinámico">RONDA (FORM DINÁMICO)</button>
+          <button class="btn" data-tipo="Resguardos">RESGUARDOS</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Firebase SDKs y config separada -->
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <script src="menu.js"></script>
+  <!-- Reemplaza por tu clave de Maps -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMap"></script>
+</body>
+</html>

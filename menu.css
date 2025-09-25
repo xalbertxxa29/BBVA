@@ -1,0 +1,385 @@
+/* General Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+/* Header */
+header {
+    background-color: #003366;
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.menu-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+#fecha {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Side Menu */
+.side-menu {
+    width: 250px;
+    height: 100%;
+    background-color: #003366;
+    color: white;
+    position: fixed;
+    top: 0;
+    left: -250px;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    padding: 0;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+.side-menu.active {
+    left: 0;
+}
+
+.side-menu .user-details {
+    padding: 20px;
+    background-color: #003366;
+    color: white;
+    text-align: left;
+}
+
+.side-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background-color: white;
+    color: black;
+}
+
+.side-menu ul li {
+    padding: 10px 20px;
+}
+
+.side-menu ul li a {
+    color: black;
+    text-decoration: none;
+    display: block;
+}
+
+.side-menu ul li a:hover {
+    background-color: #f0f0f0;
+    border-radius: 5px;
+}
+
+.logout-btn {
+    width: 100%;
+    background-color: #ff0000;
+    border: none;
+    color: white;
+    padding: 10px;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.logout-btn:hover {
+    background-color: #cc0000;
+}
+
+/* Overlay */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    display: none;
+}
+
+.overlay.active {
+    display: block;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    background-color: #f5f5f5;
+    border-bottom: 2px solid #ccc;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.tab-btn.active {
+    color: #003366;
+    border-bottom: 2px solid #003366;
+}
+
+.tab-btn:hover {
+    color: #0055aa;
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+    padding: 20px;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+#map {
+    width: 100%;
+    height: 300px;
+    border-radius: 5px;
+}
+
+/* FAB (Floating Action Button) */
+.fab-container {
+    position: fixed; /* Asegura que esté siempre visible */
+    bottom: 20px;
+    right: 20px;
+    z-index: 2000; /* Asegúrate de que esté por encima de otros elementos */
+}
+
+.fab {
+    width: 60px; /* Hazlo un poco más grande para mejor visibilidad */
+    height: 60px;
+    border-radius: 50%;
+    background-color: #003366;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.fab:hover {
+    background-color: #0055aa;
+    transform: scale(1.1); /* Añade un efecto de ampliación al pasar el cursor */
+}
+
+.fab-options {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    position: absolute;
+    bottom: 70px; /* Ajusta según el tamaño del FAB principal */
+    right: 0;
+    gap: 10px;
+}
+
+.fab.option-fab {
+    background-color: #4CAF50;
+    margin-bottom: 10px;
+}
+
+.fab.option-fab:hover {
+    background-color: #45a049;
+}
+
+.fab-container.open .fab-options {
+    display: flex;
+}
+
+.fab-container.open .fab-options {
+    display: flex; /* Se muestra cuando se abre */
+}
+
+.fab-container.open .main-fab {
+    transform: rotate(45deg); /* Gira el FAB principal al abrir */
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h1 {
+    color: #003366;
+    margin-bottom: 10px;
+}
+
+.modal-content p {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 20px;
+}
+
+.modal-options {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.modal-option {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px 15px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    flex: 1 1 calc(50% - 20px);
+}
+
+.modal-option:hover {
+    background-color: #e0e0e0;
+}
+
+.close-btn {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.close-btn:hover {
+    color: #000;
+}
+
+/* Estilos de las tarjetas de tarea */
+.tarea-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.tarea-card:hover {
+    transform: scale(1.02);
+}
+
+.tarea-info h4 {
+    margin: 0 0 5px 0;
+    color: #003366;
+}
+
+.tarea-info p {
+    margin: 0;
+    color: #555;
+    font-size: 14px;
+}
+
+.tarea-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.tarea-actions button {
+    background-color: #003366;
+    border: none;
+    color: white;
+    font-size: 16px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.tarea-actions button:hover {
+    background-color: #0055aa;
+}
+
+.btn-check {
+    background-color: #4CAF50;
+}
+
+.btn-check:hover {
+    background-color: #45a049;
+}
+
+.btn-location {
+    background-color: #FF5722;
+}
+
+.btn-location:hover {
+    background-color: #E64A19;
+}
+.btn-lupa {
+    background-color: #007BFF;
+    border: none;
+    color: white;
+    padding: 10px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    margin: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn-lupa:hover {
+    background-color: #0056b3;
+    transform: scale(1.1);
+}
+
+.btn-lupa:active {
+    background-color: #003f7f;
+}
