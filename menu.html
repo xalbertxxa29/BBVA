@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mis Tareas</title>
+  <meta name="theme-color" content="#b40000" />
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -60,7 +61,7 @@
     </div>
   </div>
 
-  <!-- Modal NUEVA TAREA (FIX: glass-loader para centrado correcto) -->
+  <!-- Modal NUEVA TAREA -->
   <div id="new-overlay" class="overlay" aria-hidden="true">
     <div class="glass-loader" role="dialog" aria-modal="true" aria-labelledby="new-title">
       <div class="glass-card">
@@ -83,7 +84,7 @@
     </div>
   </div>
 
-  <!-- Overlay de carga global (opcional) -->
+  <!-- Overlay de carga global -->
   <div id="overlay" class="overlay" aria-hidden="true">
     <div class="glass-loader">
       <div class="glass-card">
@@ -111,8 +112,20 @@
   <!-- Google Maps -->
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMap"></script>
 
-  <!-- Pequeño refuerzo inline: redirección del modal (por si no cargas menu.js) -->
+  <!-- Refuerzos inline mínimos -->
   <script>
+    // FAB "⋮" que muestra/oculta el botón "+"
+    (function(){
+      const more = document.getElementById('fab-more');
+      const opts = document.getElementById('fab-options');
+      if (!more || !opts) return;
+      more.addEventListener('click', () => {
+        const open = opts.classList.toggle('open');
+        more.setAttribute('aria-expanded', String(open));
+      });
+    })();
+
+    // Modal por si menu.js falla en cargarse
     (function () {
       const ov = document.getElementById('new-overlay');
       const typeSel = document.getElementById('new-type');

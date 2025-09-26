@@ -157,5 +157,6 @@ input:focus, select:focus, textarea:focus{
 .logout-btn{ margin:12px; }
 
 /* ===== FAB options reveal ===== */
-.fab-options{ display:none; position:absolute; bottom:70px; right:0; gap:10px; flex-direction:column; }
-.fab.open .fab-options{ display:flex; }
+.fab-options{ display:none; flex-direction:column; gap:10px; }
+.fab-container.open .fab-options,
+.fab-options.open{ display:flex; }

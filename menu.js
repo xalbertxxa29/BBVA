@@ -1,104 +1,39 @@
-// menu.js — FAB dinámico + modal con despegable
+// menu.js — FAB dinámico + modal con despegable + mapa
+(() => {
+  const $ = s => document.querySelector(s);
+  const auth = window.auth;
 
-const auth = window.auth;
-const $ = s => document.querySelector(s);
+  // ===== Menú lateral =====
+  (function sideMenu(){
+    const menuBtn = $('#menu-btn'), scrim = $('#scrim'), aside = $('#side-menu');
+    const open = ()=>{ aside.classList.add('active'); scrim.classList.add('active'); aside.setAttribute('aria-hidden','false'); };
+    const close= ()=>{ aside.classList.remove('active'); scrim.classList.remove('active'); aside.setAttribute('aria-hidden','true'); };
+    menuBtn?.addEventListener('click', open);
+    scrim?.addEventListener('click', close);
+  })();
 
-// ===== Menú lateral =====
-(function sideMenu(){
-  const menuBtn = $('#menu-btn'), scrim = $('#scrim'), aside = $('#side-menu');
-  const open = ()=>{ aside.classList.add('active'); scrim.classList.add('active'); aside.setAttribute('aria-hidden','false'); };
-  const close= ()=>{ aside.classList.remove('active'); scrim.classList.remove('active'); aside.setAttribute('aria-hidden','true'); };
-  menuBtn.addEventListener('click', open);
-  scrim.addEventListener('click', close);
-})();
-
-// ===== Tabs =====
-(function tabs(){
-  const btns = document.querySelectorAll('.tab-btn');
-  btns.forEach(b=>{
-    b.addEventListener('click', ()=>{
-      btns.forEach(x=>x.classList.remove('active'));
-      b.classList.add('active');
-      const id = b.dataset.tab;
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-      $('#tab-' + id).classList.add('active');
+  // ===== Tabs =====
+  (function tabs(){
+    const btns = document.querySelectorAll('.tab-btn');
+    btns.forEach(b=>{
+      b.addEventListener('click', ()=>{
+        btns.forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        const id = b.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + id)?.classList.add('active');
+      });
     });
-  });
-})();
+  })();
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  $('#today').textContent = new Date().toLocaleDateString();
-  auth.onAuthStateChanged(user=>{
-    if (!user) { location.href='index.html'; return; }
-    $('#user-email').textContent = user.email || 'Usuario';
-  });
-
-  // ===== FAB
-  const wrap = $('#fab');
-  const more = $('#fab-more');
-  const plus = $('#fab-plus');
-  const opt  = $('#fab-options');
-
-  const toggle = ()=>{
-    const isOpen = wrap.classList.toggle('open');
-    more.setAttribute('aria-expanded', String(isOpen));
-    opt.style.display = isOpen ? 'flex' : 'none';
-  };
-  more.addEventListener('click', toggle);
-
-  // Abrir modal directamente desde +
-  plus.addEventListener('click', (e)=>{
-    e.preventDefault();
-    wrap.classList.remove('open');
-    more.setAttribute('aria-expanded','false');
-    opt.style.display = 'none';
-    openNewModal();
-  });
-
-  // ===== Modal
-  const overlay = $('#new-overlay');
-  const select  = $('#new-type');
-  const btnOk   = $('#new-continue');
-  const btnCancel = $('#new-cancel');
-
-  function openNewModal(){
-    overlay.classList.add('active');
-    overlay.setAttribute('aria-hidden','false');
-    // foco al select para UX
-    setTimeout(()=> select.focus(), 50);
-  }
-  window.openNewModal = openNewModal; // por si se llama desde otros lugares
-
-  function closeNewModal(){
-    overlay.classList.remove('active');
-    overlay.setAttribute('aria-hidden','true');
-  }
-
-  btnCancel.addEventListener('click', closeNewModal);
-  // cerrar tocando fuera de la tarjeta
-  overlay.addEventListener('click', (ev)=>{
-    if (ev.target === overlay) closeNewModal();
-  });
-  // cerrar con ESC
-  document.addEventListener('keydown', (ev)=>{
-    if (overlay.classList.contains('active') && ev.key === 'Escape') closeNewModal();
-  });
-
-  btnOk.addEventListener('click', ()=>{
-    const v = select.value;
-    if (!v){ alert('Elige una opción.'); return; }
-    closeNewModal();
-    if (v === 'ofi') location.href = 'formularioof.html';
-    if (v === 'caj') location.href = 'formulariocaj.html';
-  });
-
-  // ===== MAPA + GPS (simple, sin bloquear UI)
+  // ===== Mapa (callback global para Google Maps) =====
   let map, meMarker, watchId=null, lastUserPos=null;
-  window.initMap = function initMap(){
+  function initMap(){
     const initial = { lat:-12.05, lng:-77.05 };
     map = new google.maps.Map(document.getElementById('map'), { center: initial, zoom: 13 });
     setTimeout(()=> google.maps.event.trigger(map,'resize'), 150);
-  };
+  }
+  window.initMap = initMap;
 
   function watchLocation(){
     if (!('geolocation' in navigator)) return;
@@ -119,16 +54,88 @@ document.addEventListener('DOMContentLoaded', ()=>{
       { enableHighAccuracy:true, maximumAge:0, timeout:12000 }
     );
   }
-  // iniciar siempre y reintentar al primer gesto
-  try{ watchLocation(); }catch{}
-  document.addEventListener('pointerdown', function once(){
-    if (!lastUserPos) watchLocation();
-    document.removeEventListener('pointerdown', once);
-  }, { once:true });
 
-  // ===== Logout
-  $('#logout').addEventListener('click', async ()=>{
-    try{ await auth.signOut(); }catch(e){ console.error(e); }
-    location.href = 'index.html';
+  document.addEventListener('DOMContentLoaded', ()=>{
+    $('#today').textContent = new Date().toLocaleDateString();
+
+    auth?.onAuthStateChanged(user=>{
+      if (!user) { location.href='index.html'; return; }
+      $('#user-email').textContent = user.email || 'Usuario';
+    });
+
+    // GPS siempre
+    try{ watchLocation(); }catch{}
+    document.addEventListener('pointerdown', function once(){
+      if (!lastUserPos) watchLocation();
+      document.removeEventListener('pointerdown', once);
+    }, { once:true });
+
+    // ===== FAB (⋮ abre/oculta +) =====
+    const wrap = $('#fab');
+    const more = $('#fab-more');
+    const plus = $('#fab-plus');
+    const opt  = $('#fab-options');
+
+    const openFab = ()=>{
+      wrap.classList.add('open');
+      more.setAttribute('aria-expanded','true');
+      opt.classList.add('open');
+      // forzar visibilidad aunque el CSS no tenga la clase
+      opt.style.display = 'flex';
+    };
+    const closeFab = ()=>{
+      wrap.classList.remove('open');
+      more.setAttribute('aria-expanded','false');
+      opt.classList.remove('open');
+      opt.style.display = 'none';
+    };
+    const toggleFab = ()=>{
+      const isOpen = wrap.classList.contains('open');
+      isOpen ? closeFab() : openFab();
+    };
+
+    more?.addEventListener('click', toggleFab);
+    // soporte táctil si el webview filtra 'click'
+    more?.addEventListener('touchend', (e)=>{ e.preventDefault(); toggleFab(); }, {passive:false});
+
+    // ===== Modal Nueva Tarea =====
+    const overlay = $('#new-overlay');
+    const select  = $('#new-type');
+    const btnOk   = $('#new-continue');
+    const btnCancel = $('#new-cancel');
+
+    function openNewModal(){
+      overlay.classList.add('active'); overlay.setAttribute('aria-hidden','false');
+      setTimeout(()=> select.focus(), 50);
+    }
+    function closeNewModal(){
+      overlay.classList.remove('active'); overlay.setAttribute('aria-hidden','true');
+    }
+
+    // El + abre el modal
+    plus?.addEventListener('click', (e)=>{
+      e.preventDefault();
+      closeFab();
+      openNewModal();
+    });
+    plus?.addEventListener('touchend', (e)=>{ e.preventDefault(); closeFab(); openNewModal(); }, {passive:false});
+
+    btnCancel?.addEventListener('click', closeNewModal);
+    overlay?.addEventListener('click', (ev)=>{ if (ev.target===overlay) closeNewModal(); });
+    document.addEventListener('keydown', (ev)=>{ if (overlay.classList.contains('active') && ev.key==='Escape') closeNewModal(); });
+
+    btnOk?.addEventListener('click', ()=>{
+      const v = select.value;
+      if (!v){ alert('Elige una opción.'); return; }
+      closeNewModal();
+      if (v === 'ofi') location.href = 'formularioof.html';
+      if (v === 'caj') location.href = 'formulariocaj.html';
+    });
+
+    // ===== Logout =====
+    $('#logout')?.addEventListener('click', async ()=>{
+      try{ await auth.signOut(); }catch(e){ console.error(e); }
+      location.href = 'index.html';
+    });
   });
-});
+})();

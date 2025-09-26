@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#b40000" />
   <title>Oficinas — Selección y Mapa</title>
   <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css" />
+
   <style>
     /* —— búsqueda y sugerencias —— */
     .search-wrap{ position:relative; }
@@ -74,7 +76,7 @@
   </style>
 </head>
 <body>
-  <!-- Overlay carga (ya existente) -->
+  <!-- Overlay carga -->
   <div id="overlay" class="overlay" aria-hidden="true">
     <div class="glass-loader">
       <div class="glass-card">
@@ -190,8 +192,8 @@
     <!-- Barra de acciones -->
     <div class="actions-bar">
       <div class="inner">
-        <button id="btn-cancelar" class="btn btn-cancel">Cancelar</button>
-        <button id="btn-enviar" class="btn btn-send">Enviar</button>
+        <button id="btn-cancelar" class="btn btn-cancel" type="button">Cancelar</button>
+        <button id="btn-enviar" class="btn btn-send" type="button">Enviar</button>
       </div>
     </div>
   </main>
