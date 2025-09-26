@@ -1,205 +1,134 @@
-// ===== Firebase (Compat) =====
-const a = window.auth;
-const d = window.db;
+// menu.js — FAB dinámico + modal con despegable
 
-// ===== Estado =====
-let MAP_READY = false;
-let map, marker, watchId = null;
-let LISTENERS_WIRED = false;
-let GEO_WIRED = false;
+const auth = window.auth;
+const $ = s => document.querySelector(s);
 
-// ===== Helpers =====
-const $  = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
+// ===== Menú lateral =====
+(function sideMenu(){
+  const menuBtn = $('#menu-btn'), scrim = $('#scrim'), aside = $('#side-menu');
+  const open = ()=>{ aside.classList.add('active'); scrim.classList.add('active'); aside.setAttribute('aria-hidden','false'); };
+  const close= ()=>{ aside.classList.remove('active'); scrim.classList.remove('active'); aside.setAttribute('aria-hidden','true'); };
+  menuBtn.addEventListener('click', open);
+  scrim.addEventListener('click', close);
+})();
 
-// ===== Auth =====
-a.onAuthStateChanged(user => {
-  if (!user) { location.href = 'index.html'; return; }
-  $('#fecha').textContent = new Date().toLocaleDateString();
-  $('#user-name').textContent = user.displayName || 'Usuario';
-  $('#user-email').textContent = user.email;
-
-  if (!LISTENERS_WIRED) wireUI();
-  loadIniciadas(user.email);
-  loadCompletadas(user.email);
-});
-
-// ===== UI =====
-function wireUI(){
-  LISTENERS_WIRED = true;
-
-  const sideMenu = $('#side-menu');
-  const menuBtn  = $('#menu-btn');
-  const scrim    = $('#menuScrim');
-
-  // Abrir: quita hidden antes de animar
-  menuBtn.addEventListener('click', () => {
-    sideMenu.hidden = false;
-    scrim.hidden = false;
-
-    sideMenu.classList.add('active');
-    scrim.classList.add('active');
-
-    menuBtn.setAttribute('aria-expanded','true');
-    sideMenu.setAttribute('aria-hidden','false');
-    scrim.setAttribute('aria-hidden','false');
-  });
-
-  // Cerrar con click en scrim
-  const closeMenu = () => {
-    sideMenu.classList.remove('active');
-    scrim.classList.remove('active');
-    menuBtn.setAttribute('aria-expanded','false');
-    sideMenu.setAttribute('aria-hidden','true');
-    scrim.setAttribute('aria-hidden','true');
-    // Espera transición y vuelve a ocultar del flujo
-    setTimeout(() => {
-      sideMenu.hidden = true;
-      scrim.hidden = true;
-    }, 280);
-  };
-  scrim.addEventListener('click', closeMenu);
-
-  // Tabs
-  const tabButtons = $$('.tab-btn');
-  const tabContents = $$('.tab-content');
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabButtons.forEach(b => b.classList.remove('active'));
-      tabContents.forEach(c => c.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(btn.dataset.tab).classList.add('active');
-
-      if (btn.dataset.tab === 'pendientes' && MAP_READY) {
-        setTimeout(() => google.maps.event.trigger(map, 'resize'), 120);
-      }
+// ===== Tabs =====
+(function tabs(){
+  const btns = document.querySelectorAll('.tab-btn');
+  btns.forEach(b=>{
+    b.addEventListener('click', ()=>{
+      btns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      const id = b.dataset.tab;
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      $('#tab-' + id).classList.add('active');
     });
   });
+})();
 
-  // Logout
-  $('#logout-btn').addEventListener('click', async () => {
-    try { await a.signOut(); location.href = 'index.html'; }
-    catch { alert('Error al cerrar sesión'); }
+document.addEventListener('DOMContentLoaded', ()=>{
+  $('#today').textContent = new Date().toLocaleDateString();
+  auth.onAuthStateChanged(user=>{
+    if (!user) { location.href='index.html'; return; }
+    $('#user-email').textContent = user.email || 'Usuario';
   });
 
-  // Modal “tipo”
-  const modal = $('#type-modal');
-  const openModal = () => { modal.hidden = false; modal.classList.add('active'); modal.setAttribute('aria-hidden','false'); };
-  const closeModal = () => { modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); setTimeout(()=> modal.hidden=true, 150); };
-  $('#add-fab').addEventListener('click', openModal);
-  $('#type-cancel').addEventListener('click', closeModal);
-  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
-  $('#type-go').addEventListener('click', () => {
-    const v = $('#tipo-destino').value;
-    if (!v) { alert('Selecciona una opción'); return; }
-    closeModal();
-    if (v === 'CAJEROS') location.href = 'formulariocaj.html';
-    else location.href = 'formularioof.html';
+  // ===== FAB
+  const wrap = $('#fab');
+  const more = $('#fab-more');
+  const plus = $('#fab-plus');
+  const opt  = $('#fab-options');
+
+  const toggle = ()=>{
+    const isOpen = wrap.classList.toggle('open');
+    more.setAttribute('aria-expanded', String(isOpen));
+    opt.style.display = isOpen ? 'flex' : 'none';
+  };
+  more.addEventListener('click', toggle);
+
+  // Abrir modal directamente desde +
+  plus.addEventListener('click', (e)=>{
+    e.preventDefault();
+    wrap.classList.remove('open');
+    more.setAttribute('aria-expanded','false');
+    opt.style.display = 'none';
+    openNewModal();
   });
 
-  // Arrancar mapa si ya está el script
-  if (window.google && window.google.maps && !MAP_READY) initMap();
+  // ===== Modal
+  const overlay = $('#new-overlay');
+  const select  = $('#new-type');
+  const btnOk   = $('#new-continue');
+  const btnCancel = $('#new-cancel');
 
-  // Habilitar GPS con gesto del usuario
-  $('#gps-btn').addEventListener('click', startGeoOnce, { once:true });
-  document.addEventListener('pointerdown', startGeoOnce, { once:true });
-}
+  function openNewModal(){
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden','false');
+    // foco al select para UX
+    setTimeout(()=> select.focus(), 50);
+  }
+  window.openNewModal = openNewModal; // por si se llama desde otros lugares
 
-// ===== Datos dummy =====
-function loadCompletadas(userEmail){
-  const cont = $('#completados-container');
-  cont.innerHTML = '';
-  d.collection('tareas')
-    .where('userEmail','==',userEmail).where('estado','==','completado')
-    .get()
-    .then(q=>{
-      if (q.empty){ cont.innerHTML = '<p>No hay tareas completadas.</p>'; return; }
-      q.forEach(doc => cont.appendChild(cardCompletada({ id:doc.id, ...doc.data() })));
-    })
-    .catch(err => console.error('Completados:', err));
-}
-function cardCompletada(t){
-  const div = document.createElement('div');
-  div.className = 'tarea-card';
-  div.innerHTML = `
-    <div class="tarea-info">
-      <h4>${t.clienteId || '-'}</h4>
-      <p>${t.tipoTarea || ''}</p>
-      <p>${t.distrito || ''} - ${t.fecha || ''}</p>
-    </div>
-    <div class="tarea-actions">
-      <button class="btn-check" title="Ver">🔍</button>
-    </div>`;
-  return div;
-}
-function loadIniciadas(userEmail){
-  const cont = $('#iniciados');
-  cont.innerHTML = '<h2>Tareas Iniciadas</h2>';
-  d.collection('tareas')
-    .where('userEmail','==',userEmail).where('estado','==','pendiente')
-    .get()
-    .then(q=>{
-      if (q.empty){ cont.insertAdjacentHTML('beforeend','<p>No hay tareas iniciadas.</p>'); return; }
-      q.forEach(doc => cont.appendChild(cardPendiente({ id:doc.id, ...doc.data() })));
-    })
-    .catch(err => console.error('Iniciadas:', err));
-}
-function cardPendiente(t){
-  const div = document.createElement('div');
-  div.className = 'tarea-card';
-  div.innerHTML = `
-    <div class="tarea-info">
-      <h4>${t.clienteId || '-'}</h4>
-      <p>${t.tipoTarea || ''}</p>
-      <p>${t.distrito || ''} - ${t.fecha || ''}</p>
-    </div>
-    <div class="tarea-actions">
-      <button class="btn-check" title="Marcar como completado">✔</button>
-      <button class="btn-location" title="Ver ubicación">📍</button>
-    </div>`;
-  div.querySelector('.btn-check').addEventListener('click', async () => {
-    try{
-      await d.collection('tareas').doc(t.id).update({ estado:'completado' });
-      div.remove();
-      $('#completados-container').appendChild(cardCompletada(t));
-    }catch(e){ console.error(e); alert('No se pudo completar la tarea.'); }
+  function closeNewModal(){
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden','true');
+  }
+
+  btnCancel.addEventListener('click', closeNewModal);
+  // cerrar tocando fuera de la tarjeta
+  overlay.addEventListener('click', (ev)=>{
+    if (ev.target === overlay) closeNewModal();
   });
-  div.querySelector('.btn-location').addEventListener('click', () => {
-    alert(`Ubicación: Lat ${t.latitudCliente}, Lng ${t.longitudCliente}`);
+  // cerrar con ESC
+  document.addEventListener('keydown', (ev)=>{
+    if (overlay.classList.contains('active') && ev.key === 'Escape') closeNewModal();
   });
-  return div;
-}
 
-// ===== Google Maps =====
-function initMap(){
-  if (MAP_READY) return;
-  MAP_READY = true;
-  const initialPosition = { lat: -12.0453, lng: -77.0311 };
-  map = new google.maps.Map(document.getElementById('map'), { center: initialPosition, zoom: 15 });
-  marker = new google.maps.Marker({ position: initialPosition, map, title:'Tu ubicación' });
-  setTimeout(() => google.maps.event.trigger(map, 'resize'), 150);
-}
-window.initMap = initMap;
+  btnOk.addEventListener('click', ()=>{
+    const v = select.value;
+    if (!v){ alert('Elige una opción.'); return; }
+    closeNewModal();
+    if (v === 'ofi') location.href = 'formularioof.html';
+    if (v === 'caj') location.href = 'formulariocaj.html';
+  });
 
-// Geolocalización solo tras gesto
-function startGeoOnce(){
-  if (GEO_WIRED) return;
-  GEO_WIRED = true;
-  if (!('geolocation' in navigator)) return alert('Tu navegador no soporta geolocalización.');
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  watchId = navigator.geolocation.watchPosition(
-    p => {
-      const pos = { lat:p.coords.latitude, lng:p.coords.longitude };
-      if (!marker) return;
-      marker.setPosition(pos);
-      map.setCenter(pos);
-    },
-    err => console.warn('GPS:', err.message),
-    { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
-  );
-}
+  // ===== MAPA + GPS (simple, sin bloquear UI)
+  let map, meMarker, watchId=null, lastUserPos=null;
+  window.initMap = function initMap(){
+    const initial = { lat:-12.05, lng:-77.05 };
+    map = new google.maps.Map(document.getElementById('map'), { center: initial, zoom: 13 });
+    setTimeout(()=> google.maps.event.trigger(map,'resize'), 150);
+  };
 
-// Limpieza
-window.addEventListener('beforeunload', () => {
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  function watchLocation(){
+    if (!('geolocation' in navigator)) return;
+    if (watchId!==null) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(
+      p=>{
+        lastUserPos = { lat:p.coords.latitude, lng:p.coords.longitude };
+        if (!window.google || !map) return;
+        if (!meMarker){
+          meMarker = new google.maps.Marker({
+            map, position:lastUserPos, title:'Tu ubicación',
+            icon:'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+          });
+        }else meMarker.setPosition(lastUserPos);
+        map.setCenter(lastUserPos);
+      },
+      e=>console.warn('GPS:', e.message),
+      { enableHighAccuracy:true, maximumAge:0, timeout:12000 }
+    );
+  }
+  // iniciar siempre y reintentar al primer gesto
+  try{ watchLocation(); }catch{}
+  document.addEventListener('pointerdown', function once(){
+    if (!lastUserPos) watchLocation();
+    document.removeEventListener('pointerdown', once);
+  }, { once:true });
+
+  // ===== Logout
+  $('#logout').addEventListener('click', async ()=>{
+    try{ await auth.signOut(); }catch(e){ console.error(e); }
+    location.href = 'index.html';
+  });
 });

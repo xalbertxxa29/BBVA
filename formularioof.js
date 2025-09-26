@@ -1,24 +1,112 @@
-// Firebase (Compat)
+// formularioof.js — Cámara integrada (captura local) + subida diferida al Enviar
+// Firebase (Compat) expuesto por firebase-config.js
 const a = window.auth;
 const d = window.db;
+const storage = window.storage || firebase.storage();
 
 // Utils
 const $  = s => document.querySelector(s);
 const normU = t => (t||'').toString().normalize('NFD').replace(/\p{Diacritic}/gu,'').toUpperCase();
 
-// Overlay
+// Overlay moderno
 function showOverlay(msg='Cargando…', sub=''){
   const m = $('#overlay-msg'), s = $('#overlay-sub');
   if (m) m.textContent = msg;
   if (s) s.textContent = sub || '';
+  setProgress(0);
   $('#overlay').classList.add('active');
 }
 function hideOverlay(){ $('#overlay').classList.remove('active'); }
+function setProgress(f){ const el = $('#overlay-progress'); if (el) el.style.width = `${Math.max(0, Math.min(100, Math.round((f||0)*100)))}%`; }
 
-// Estado
+// ===== Estado general =====
 let OFFICES = [];
 let map, meMarker, ofiMarker, geocoder, watchId = null;
-let GEO_WIRED = false;
+let lastUserPos = null;
+
+// ===== FOTOS (local hasta Enviar) =====
+// Cada elemento: { blob:Blob, preview:string, remoteUrl?:string }
+let PHOTOS = [];
+
+function addPhotoBlob(blob){
+  const preview = URL.createObjectURL(blob);
+  PHOTOS.push({ blob, preview });
+  renderPreviews();
+}
+function clearPhotos(){
+  try{ PHOTOS.forEach(p => p.preview && URL.revokeObjectURL(p.preview)); }catch{}
+  PHOTOS = [];
+  renderPreviews();
+}
+function renderPreviews(){
+  const wrap = $('#foto-preview');
+  wrap.innerHTML = '';
+  PHOTOS.forEach((p, idx)=>{
+    const box = document.createElement('div');
+    box.className = 'thumb';
+    box.innerHTML = `<button class="del" title="Eliminar">&times;</button>`;
+    const img = new Image(); img.src = p.preview; box.appendChild(img);
+    box.querySelector('.del').addEventListener('click', ()=>{
+      try{ URL.revokeObjectURL(PHOTOS[idx].preview); }catch{}
+      PHOTOS.splice(idx,1); renderPreviews();
+    });
+    wrap.appendChild(box);
+  });
+}
+
+// ===== Cámara integrada =====
+let camStream = null;
+let camFacing = 'environment';
+const camEls = {};
+function camGrabEls(){
+  camEls.wrap = $('#cam-overlay');
+  camEls.video= $('#cam-video');
+  camEls.hint = $('#cam-hint');
+  camEls.close= $('#cam-close');
+  camEls.flip = $('#cam-flip');
+  camEls.shoot= $('#cam-shoot');
+  camEls.fallbackWrap = $('#cam-fallback');
+  camEls.fileBtn = $('#cam-file-btn');
+  camEls.filePick= $('#cam-file');
+}
+async function camStart(){
+  if (camStream) camStream.getTracks().forEach(t=>t.stop());
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal: camFacing } }, audio:false });
+    camEls.video.srcObject = camStream;
+    await camEls.video.play();
+    camEls.video.style.transform = (camFacing==='user') ? 'scaleX(-1)' : 'none';
+    camEls.fallbackWrap.hidden = true;
+  }catch(err){
+    console.warn('getUserMedia falló -> fallback', err);
+    camEls.fallbackWrap.hidden = false;
+    camEls.hint.textContent = 'Si tu WebView bloquea la cámara, usa “Cámara nativa”.';
+  }
+}
+function camOpen(){ camEls.wrap.classList.add('active'); camEls.wrap.setAttribute('aria-hidden','false'); camStart(); }
+function camClose(){ if (camStream) camStream.getTracks().forEach(t=>t.stop()); camEls.wrap.classList.remove('active'); camEls.wrap.setAttribute('aria-hidden','true'); }
+function camCaptureBlob(){
+  const canvas = document.createElement('canvas');
+  canvas.width  = camEls.video.videoWidth || 1280;
+  canvas.height = camEls.video.videoHeight|| 720;
+  const ctx = canvas.getContext('2d');
+  if (camFacing==='user'){ ctx.translate(canvas.width,0); ctx.scale(-1,1); }
+  ctx.drawImage(camEls.video, 0, 0, canvas.width, canvas.height);
+  return new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9));
+}
+async function camFromCamera(){
+  try{
+    const b = await camCaptureBlob();
+    addPhotoBlob(b);         // ← sólo guardamos local y mostramos miniatura
+    camClose();
+  }catch(e){ alert('No se pudo capturar la foto.'); console.error(e); }
+}
+function camFromFiles(files){
+  const arr = Array.from(files||[]);
+  if (!arr.length) return;
+  arr.forEach(f => addPhotoBlob(f));  // ← también local
+  camClose();
+}
 
 // ===== Inicio =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -29,19 +117,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   showOverlay('Cargando oficinas…','Leyendo colección OFICINAS');
   await loadOffices(); hideOverlay();
 
-  wireSearch(); wireCamera();
+  wireSearch(); wireCamera(); wireActions();
 
   showOverlay('Cargando categorías…','Leyendo colección CATEGORIA');
   await loadCategorias(); hideOverlay();
 
-  // listeners de selects
-  $('#sel-cat').addEventListener('change', onCategoriaChange);
-  $('#sel-motivo').addEventListener('change', onMotivoChange);
-  $('#sel-nov').addEventListener('change', onNovedadChange);
-
-  // GPS sólo tras gesto
-  $('#btn-gps-ofi').addEventListener('click', startGeoOnce, { once:true });
-  document.addEventListener('pointerdown', startGeoOnce, { once:true });
+  startGeoAlways(); // GPS siempre
 });
 
 // =================== OFICINAS ===================
@@ -51,7 +132,6 @@ async function loadOffices(){
     OFFICES = snap.docs.map(doc => ({ id: doc.id, data: doc.data() }));
   }catch(e){ console.error('OFICINAS:', e); alert('No se pudieron cargar las oficinas.'); }
 }
-
 function wireSearch(){
   const input = $('#of-search'), sug = $('#of-suggest');
   const render = items => {
@@ -79,7 +159,6 @@ function wireSearch(){
     sug.classList.remove('show');
   });
 }
-
 function applyOffice(ofi){
   const dta = ofi.data||{};
   $('#of-search').value  = ofi.id;
@@ -87,7 +166,6 @@ function applyOffice(ofi){
   $('#of-codigo').value  = dta.CODIGO || '';
   $('#of-direccion').value = dta.DIRECCION || '';
   $('#of-distrito').value  = dta.DISTRITO || '';
-  '#of-site' in document ? $('#of-site').value = dta.SITE || '' : null;
   $('#of-site').value      = dta.SITE || '';
   $('#of-consola').value   = dta.CONSOLA || '';
   $('#of-moto-save').value = dta['MOTO SAVE'] || '';
@@ -95,7 +173,7 @@ function applyOffice(ofi){
   $('#of-turbina').value   = dta['TURBINA'] || '';
   $('#of-status').value    = dta['STATUS DE FUNCIONAMIENTO'] || '';
 
-  // Geocodificar si Maps ya cargó
+  // Geocodificación (Perú)
   if (typeof google !== 'undefined' && google.maps) {
     const addr = [dta.DIRECCION, dta.DISTRITO, 'Perú'].filter(Boolean).join(', ');
     geocoder.geocode({ address: addr }, (results, status)=>{
@@ -110,7 +188,6 @@ function applyOffice(ofi){
 }
 
 // =================== CATEGORÍAS / MOTIVOS / NOVEDADES ===================
-// Mapeo explícito + heurística para nombres de subcolecciones
 const SUB_MAP = {
   "ATM'S":        ['RONDA_ATM','RONDA_ATMS'],
   'OFICINAS':     ['RONDA_OF','RONDA_OFI','RONDA_OFICINAS'],
@@ -129,8 +206,8 @@ function buildCandidates(cat){
   cand.add(words.join('_'));
   words.forEach(w => { cand.add(w); cand.add(w.slice(0,3)); cand.add(w.slice(0,2)); });
   const first = words[0] || ''; const lastW = words[words.length-1] || '';
-  const pair1 = (first[0]||'') + (lastW[0]||'');     // OPEN OF SERVICE -> OS
-  const pair2 = (first[0]||'') + (first.slice(-1)||''); // RESIDENCIAS -> RS
+  const pair1 = (first[0]||'') + (lastW[0]||'');
+  const pair2 = (first[0]||'') + (first.slice(-1)||'');
   if (pair1) cand.add(pair1); if (pair2) cand.add(pair2);
   const out = new Set(); cand.forEach(t => out.add(`RONDA_${t}`));
   const F = (first[0]||'R'); for (let i=65;i<=90;i++) out.add(`RONDA_${F}${String.fromCharCode(i)}`);
@@ -146,7 +223,6 @@ async function loadCategorias(){
   }catch(e){ console.error('CATEGORIA:', e); }
 }
 async function getMotivosForCategoria(cat){
-  // 1) índice opcional CATEGORIA/{cat}/__index__/subcollections { names:[...] }
   try{
     const idx = await d.doc(`CATEGORIA/${cat}/__index__/subcollections`).get();
     if (idx.exists){
@@ -154,7 +230,6 @@ async function getMotivosForCategoria(cat){
       if (names.length) return names;
     }
   }catch{}
-  // 2) probar candidatos con .limit(1)
   const candidates = buildCandidates(cat);
   const found = [];
   for (const name of [...new Set(candidates)].slice(0,40)){
@@ -224,7 +299,7 @@ async function onNovedadChange(){
   hideOverlay();
 }
 
-// =================== MAPAS ===================
+// =================== MAPAS & GPS ===================
 function setOfficeMarker(pos){
   if (!ofiMarker){
     ofiMarker = new google.maps.Marker({ map, position: pos, title:'Oficina', icon:'http://maps.google.com/mapfiles/ms/icons/red-dot.png' });
@@ -238,12 +313,19 @@ function initUserWatch(){
   if (watchId!==null) navigator.geolocation.clearWatch(watchId);
   watchId = navigator.geolocation.watchPosition(
     p=>{
-      const pos = { lat:p.coords.latitude, lng:p.coords.longitude };
-      if (!meMarker) meMarker = new google.maps.Marker({ map, position: pos, title:'Tu ubicación', icon:'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' });
-      else meMarker.setPosition(pos);
+      lastUserPos = { lat:p.coords.latitude, lng:p.coords.longitude };
+      if (!meMarker) meMarker = new google.maps.Marker({ map, position: lastUserPos, title:'Tu ubicación', icon:'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' });
+      else meMarker.setPosition(lastUserPos);
     },
     e=>console.warn('GPS:', e.message), { enableHighAccuracy:true, maximumAge:0, timeout:12000 }
   );
+}
+function startGeoAlways(){
+  try{ initUserWatch(); }catch{}
+  document.addEventListener('pointerdown', function once(){
+    if (!lastUserPos) initUserWatch();
+    document.removeEventListener('pointerdown', once);
+  }, { once:true });
 }
 function initMapInternal(){
   const initial = { lat:-12.0453, lng:-77.0311 };
@@ -254,23 +336,126 @@ function initMapInternal(){
 function initMapOfi(){ initMapInternal(); }
 window.initMapOfi = initMapOfi;
 
-// GPS sólo tras gesto
-function startGeoOnce(){
-  if (GEO_WIRED) return;
-  GEO_WIRED = true;
-  initUserWatch();
+// =================== Cámara: wiring ===================
+function wireCamera(){
+  camGrabEls();
+  $('#btn-foto').addEventListener('click', camOpen);
+  camEls.close.addEventListener('click', camClose);
+  camEls.shoot.addEventListener('click', camFromCamera);
+  camEls.flip.addEventListener('click', async ()=>{
+    camFacing = camFacing==='environment' ? 'user' : 'environment';
+    await camStart();
+  });
+  camEls.fileBtn.addEventListener('click', ()=> camEls.filePick.click());
+  camEls.filePick.addEventListener('change', ()=> camFromFiles(camEls.filePick.files));
 }
 
-// =================== Cámara ===================
-function wireCamera(){
-  const btn = $('#btn-foto'), inp = $('#inp-foto'), preview = $('#foto-preview');
-  btn.addEventListener('click', ()=> inp.click());
-  inp.addEventListener('change', ()=>{
-    preview.innerHTML='';  [...(inp.files||[])].forEach(f=>{
-      const url = URL.createObjectURL(f); const img = new Image();
-      img.onload = ()=> URL.revokeObjectURL(url); img.src = url; img.width=120; img.height=120;
-      img.style.objectFit='cover'; img.style.borderRadius='12px'; img.style.border='1px solid var(--border)';
-      preview.appendChild(img);
-    });
+// =================== Cancelar / Enviar ===================
+function wireActions(){
+  $('#btn-cancelar').addEventListener('click', async ()=>{
+    try{
+      $('#of-search').value = '';
+      ['of-name','of-codigo','of-direccion','of-distrito','of-site','of-consola','of-moto-save','of-motorizado','of-turbina','of-status'].forEach(id=> { const el=$( '#'+id ); if(el) el.value=''; });
+      ['sel-cat','sel-motivo','sel-nov','sel-detalle','of-turno'].forEach(id=>{ const el=$('#'+id); if(el) el.value=''; });
+      $('#comentario').value = '';
+      clearPhotos();
+    }finally{
+      window.location.href = 'menu.html';
+    }
   });
+  $('#btn-enviar').addEventListener('click', sendForm);
 }
+
+async function uploadAllPhotos(){
+  if (!PHOTOS.length) return [];
+  const uid = (a.currentUser && a.currentUser.uid) || 'anon';
+  const urls = [];
+
+  showOverlay('Subiendo fotos…', 'Preparando');
+  for (let i=0; i<PHOTOS.length; i++){
+    const p = PHOTOS[i];
+    if (!p.remoteUrl){
+      const ref = storage.ref(`capturas/${uid}/${Date.now()}-${i}.jpg`);
+      await ref.put(p.blob);
+      p.remoteUrl = await ref.getDownloadURL();
+    }
+    urls.push(p.remoteUrl);
+    setProgress((i+1)/PHOTOS.length);
+    $('#overlay-sub').textContent = `Foto ${i+1} de ${PHOTOS.length}`;
+  }
+  return urls;
+}
+
+async function sendForm(){
+  const user = a.currentUser;
+  const ofName = $('#of-name').value.trim();
+  const turno  = $('#of-turno').value;
+  const cat    = $('#sel-cat').value;
+  const mot    = $('#sel-motivo').value;
+  const nov    = $('#sel-nov').value;
+  const det    = $('#sel-detalle').value;
+  const comment= $('#comentario').value.trim();
+
+  if (!ofName){ alert('Selecciona una oficina.'); return; }
+  if (!turno){ alert('Selecciona el turno.'); return; }
+  if (!cat || !mot || !nov){ alert('Completa la clasificación (Categoría, Motivo y Novedad).'); return; }
+
+  // Intento de geo si aún no hay posición
+  if (!lastUserPos && navigator.geolocation){
+    try{
+      const p = await new Promise((res,rej)=> navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:8000}));
+      lastUserPos = { lat:p.coords.latitude, lng:p.coords.longitude };
+    }catch{}
+  }
+
+  const ofPos = ofiMarker && ofiMarker.getPosition() ? { lat: ofiMarker.getPosition().lat(), lng: ofiMarker.getPosition().lng() } : null;
+
+  // 1) Subir fotos (si hubiera)
+  const fotoURLs = await uploadAllPhotos();
+
+  // 2) Guardar reporte
+  const payload = {
+    tipo: 'OFICINA',
+    oficina: {
+      id: ofName,
+      codigo: $('#of-codigo').value,
+      direccion: $('#of-direccion').value,
+      distrito: $('#of-distrito').value,
+      site: $('#of-site').value,
+      consola: $('#of-consola').value,
+      moto_save: $('#of-moto-save').value,
+      motorizado: $('#of-motorizado').value,
+      turbina: $('#of-turbina').value,
+      status_funcionamiento: $('#of-status').value,
+      turno
+    },
+    clasificacion: { categoria:cat, motivo:mot, novedad:nov, detalle:det },
+    comentario: comment,
+    fotos: fotoURLs,
+    geo: { usuario: lastUserPos || null, oficina: ofPos || null },
+    user: user ? { uid:user.uid, email:user.email || null } : null,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    showOverlay('Enviando reporte…','Guardando en Firestore'); setProgress(1);
+    await d.collection('reportes_oficinas').add(payload);
+    hideOverlay();
+    alert('Reporte enviado correctamente.');
+    clearPhotos();
+    window.location.href = 'menu.html';
+  }catch(e){
+    hideOverlay();
+    console.error(e);
+    alert('No se pudo enviar el reporte.');
+  }
+}
+
+// Eventos de selects
+$('#sel-cat')?.addEventListener('change', onCategoriaChange);
+$('#sel-motivo')?.addEventListener('change', onMotivoChange);
+$('#sel-nov')?.addEventListener('change', onNovedadChange);
+
+// Map init callback global
+function initMapOfi(){ const initial = { lat:-12.0453, lng:-77.0311 }; map = new google.maps.Map(document.getElementById('map-ofi'), { center: initial, zoom: 13 }); geocoder = new google.maps.Geocoder(); setTimeout(()=> google.maps.event.trigger(map, 'resize'), 150); }
+window.initMapOfi = initMapOfi;

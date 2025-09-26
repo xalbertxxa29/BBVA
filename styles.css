@@ -136,3 +136,26 @@ input:focus, select:focus, textarea:focus{
 
 /* Evita saltos en WebView al aparecer teclado */
 @supports (height: 100dvh){ .auth-shell{ min-height:100dvh; } }
+
+/* ===== Scrim + Menú lateral (mostrar/ocultar) ===== */
+.scrim{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; z-index:900; }
+.scrim.active{ display:block; }
+
+.side-menu{
+  position:fixed; inset:0 auto 0 0; width:min(86vw, 320px);
+  background:#fff; border-right:1px solid var(--border);
+  transform:translateX(-100%); transition:transform .28s ease;
+  z-index:1200; display:flex; flex-direction:column;
+}
+.side-menu.active{ transform:translateX(0); }
+.side-menu .user-details{ padding:16px; border-bottom:1px solid var(--border); }
+.side-menu .user-details p{ margin:3px 0; }
+.side-menu ul{ list-style:none; margin:0; padding:6px; }
+.side-menu li{ margin:4px 0; }
+.side-menu a{ display:block; padding:10px 12px; border-radius:10px; color:var(--fg); text-decoration:none; }
+.side-menu a:hover{ background:var(--danger-3); }
+.logout-btn{ margin:12px; }
+
+/* ===== FAB options reveal ===== */
+.fab-options{ display:none; position:absolute; bottom:70px; right:0; gap:10px; flex-direction:column; }
+.fab.open .fab-options{ display:flex; }

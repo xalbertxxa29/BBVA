@@ -1,47 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mis Tareas</title>
   <link rel="icon" href="favicon.ico" />
-  <!-- Estilos principales -->
   <link rel="stylesheet" href="styles.css" />
-  <!-- Estilos específicos del menú (si lo usas) -->
-  <link rel="stylesheet" href="menu.css" />
-  <!-- Fallback ultra ligero por si el CSS externo no carga -->
-  <style>
-    .side-menu ul{list-style:none;margin:0;padding:6px}
-    .side-menu a{text-decoration:none}
-  </style>
 </head>
 <body>
-  <!-- Garantiza que NO hay SW (no PWA) -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
-    }
-    if (window.caches && caches.keys) {
-      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-    }
-  </script>
-
-  <!-- Scrim detrás del menú: oculto por defecto -->
-  <div id="menuScrim" class="scrim" hidden aria-hidden="true"></div>
-
-  <header class="header">
-    <div class="title">
-      <button id="menu-btn" class="menu-btn" aria-controls="side-menu" aria-expanded="false" aria-label="Abrir menú">☰</button>
-      <h1>Mis Tareas</h1>
-    </div>
-    <p id="fecha" aria-live="polite"></p>
-  </header>
-
-  <!-- Drawer: empieza oculto (hidden) para evitar que aparezca en el flujo -->
-  <nav id="side-menu" class="side-menu" hidden aria-label="Menú lateral" aria-hidden="true">
+  <!-- Scrim + Drawer -->
+  <div id="scrim" class="scrim" aria-hidden="true"></div>
+  <aside id="side-menu" class="side-menu" aria-hidden="true">
     <div class="user-details">
-      <p id="user-name">Usuario</p>
-      <p id="user-email">correo@empresa.com</p>
+      <p id="user-email">Usuario</p>
     </div>
     <ul>
       <li><a href="menu.html">Mis Tareas</a></li>
@@ -49,81 +20,122 @@
       <li><a href="#">Mapa de Tareas</a></li>
       <li><a href="#">Historial</a></li>
       <li><a href="#">Dashboard</a></li>
-    </ul>
-    <hr />
-    <ul>
       <li><a href="#">Cambiar de Equipo</a></li>
       <li><a href="#">Ajustes</a></li>
     </ul>
-    <hr />
-    <button id="logout-btn" class="btn btn-danger logout-btn">Cerrar Sesión</button>
-  </nav>
+    <button id="logout" class="btn btn-danger logout-btn">Cerrar Sesión</button>
+  </aside>
 
-  <main>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="pendientes">Pendientes</button>
-      <button class="tab-btn" data-tab="iniciados">Iniciados</button>
-      <button class="tab-btn" data-tab="completados">Completados</button>
+  <!-- Header -->
+  <header class="header">
+    <div class="title">
+      <button id="menu-btn" class="menu-btn" aria-label="Menú">☰</button>
+      <h1 style="margin:0">Mis Tareas</h1>
     </div>
+    <p id="today"></p>
+  </header>
 
-    <section id="pendientes" class="tab-content active">
-      <h2>Pendientes</h2>
-      <p>Tu ubicación actual en el mapa:</p>
-      <div id="map"></div>
-      <div style="margin-top:10px;">
-        <button id="gps-btn" class="btn btn-ghost">Habilitar GPS</button>
-      </div>
-    </section>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="pend">Pendientes</button>
+    <button class="tab-btn" data-tab="ini">Iniciados</button>
+    <button class="tab-btn" data-tab="comp">Completados</button>
+  </div>
 
-    <section id="iniciados" class="tab-content">
-      <h2>Tareas Iniciadas</h2>
-    </section>
+  <!-- Contenidos -->
+  <section id="tab-pend" class="tab-content active">
+    <h2>Pendientes</h2>
+    <p>Tu ubicación actual en el mapa:</p>
+    <div id="map" style="width:100%;height:330px;border:1px solid var(--border);border-radius:12px;"></div>
+  </section>
 
-    <section id="completados" class="tab-content">
-      <h2>Tareas Completadas</h2>
-      <div id="completados-container"></div>
-    </section>
+  <section id="tab-ini" class="tab-content"><p>Sin datos por ahora.</p></section>
+  <section id="tab-comp" class="tab-content"><p>Sin datos por ahora.</p></section>
 
-    <!-- FAB: abrir modal de tipo -->
-    <div class="fab-container">
-      <button class="fab" id="add-fab" aria-label="Nueva tarea">＋</button>
-      <button class="fab" id="main-fab" aria-label="Más acciones">⋮</button>
+  <!-- FAB: ⋮ que despliega el + -->
+  <div class="fab-container" id="fab">
+    <button id="fab-more" class="fab" aria-expanded="false" title="Más">⋮</button>
+    <div class="fab-options" id="fab-options">
+      <button id="fab-plus" class="fab" title="Nueva tarea">+</button>
     </div>
-  </main>
+  </div>
 
-  <!-- Modal selección de destino -->
-  <div id="type-modal" class="overlay" hidden aria-hidden="true">
-    <div class="glass-loader">
+  <!-- Modal NUEVA TAREA (FIX: glass-loader para centrado correcto) -->
+  <div id="new-overlay" class="overlay" aria-hidden="true">
+    <div class="glass-loader" role="dialog" aria-modal="true" aria-labelledby="new-title">
       <div class="glass-card">
-        <div class="loader-title">Nuevo formulario</div>
-        <p class="loader-sub">Selecciona el destino para continuar.</p>
-        <div style="margin:10px 0 16px">
-          <label class="sr-only" for="tipo-destino">Destino</label>
-          <select id="tipo-destino" class="input">
+        <h3 id="new-title" class="loader-title">Nueva tarea</h3>
+        <p class="loader-sub" style="margin-top:-6px">Selecciona el tipo de formulario</p>
+
+        <div style="margin:10px 0 16px;">
+          <select id="new-type" class="input">
             <option value="">Seleccionar…</option>
-            <option value="CAJEROS">CAJEROS</option>
-            <option value="OFICINAS">OFICINAS</option>
+            <option value="ofi">OFICINAS</option>
+            <option value="caj">CAJEROS</option>
           </select>
         </div>
-        <div style="display:flex; gap:10px; justify-content:flex-end">
-          <button id="type-cancel" class="btn btn-ghost">Cancelar</button>
-          <button id="type-go" class="btn btn-danger">Continuar</button>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button id="new-cancel" class="btn btn-ghost">Cancelar</button>
+          <button id="new-continue" class="btn btn-danger">Continuar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay de carga global (opcional) -->
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="glass-loader">
+      <div class="glass-card">
+        <div class="loader-ring">
+          <span class="ring r1"></span><span class="ring r2"></span>
+          <span class="logo"><img src="icon-192.png" alt="LiderControl"></span>
+        </div>
+        <div class="loader-title" id="overlay-msg">Cargando…</div>
+        <div class="progress-bar"><div class="progress-fill" id="overlay-progress"></div></div>
+        <p class="loader-sub" id="overlay-sub">Conectando con servicios</p>
       </div>
     </div>
   </div>
 
   <!-- Firebase compat + config -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
 
-  <!-- Lógica -->
+  <!-- Lógica principal -->
   <script src="menu.js"></script>
 
   <!-- Google Maps -->
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMap"></script>
+
+  <!-- Pequeño refuerzo inline: redirección del modal (por si no cargas menu.js) -->
+  <script>
+    (function () {
+      const ov = document.getElementById('new-overlay');
+      const typeSel = document.getElementById('new-type');
+      const btnOk = document.getElementById('new-continue');
+      const btnCancel = document.getElementById('new-cancel');
+      const plus = document.getElementById('fab-plus');
+
+      function openModal(){ ov.classList.add('active'); ov.setAttribute('aria-hidden','false'); setTimeout(()=>typeSel.focus(),50); }
+      function closeModal(){ ov.classList.remove('active'); ov.setAttribute('aria-hidden','true'); }
+
+      plus?.addEventListener('click', (e)=>{ e.preventDefault(); openModal(); });
+      btnCancel?.addEventListener('click', closeModal);
+      ov?.addEventListener('click', (ev)=>{ if (ev.target===ov) closeModal(); });
+      document.addEventListener('keydown', (ev)=>{ if (ov.classList.contains('active') && ev.key==='Escape') closeModal(); });
+
+      btnOk?.addEventListener('click', ()=>{
+        const v = typeSel.value;
+        if(!v){ alert('Elige una opción.'); return; }
+        closeModal();
+        if (v==='ofi') location.href = 'formularioof.html';
+        if (v==='caj') location.href = 'formulariocaj.html';
+      });
+    })();
+  </script>
 </body>
 </html>
