@@ -1,48 +1,64 @@
-// ===== Firebase (Compat) expuesto por firebase-config.js =====
+// ===== Firebase (Compat) =====
 const a = window.auth;
 const d = window.db;
 
-// ===== Guards globales para evitar dobles inits =====
+// ===== Estado =====
 let MAP_READY = false;
 let map, marker, watchId = null;
 let LISTENERS_WIRED = false;
+let GEO_WIRED = false;
 
 // ===== Helpers =====
-const $ = s => document.querySelector(s);
+const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 
-// ===== Auth guard y carga inicial =====
+// ===== Auth =====
 a.onAuthStateChanged(user => {
-  if (!user) { window.location.href = 'index.html'; return; }
-  // Header
+  if (!user) { location.href = 'index.html'; return; }
   $('#fecha').textContent = new Date().toLocaleDateString();
   $('#user-name').textContent = user.displayName || 'Usuario';
   $('#user-email').textContent = user.email;
 
-  // Evitar volver a cablear listeners si el SDK re-emite el estado
   if (!LISTENERS_WIRED) wireUI();
   loadIniciadas(user.email);
   loadCompletadas(user.email);
 });
 
-// ===== UI wiring (solo una vez) =====
+// ===== UI =====
 function wireUI(){
   LISTENERS_WIRED = true;
 
-  // Menú lateral
   const sideMenu = $('#side-menu');
-  const menuBtn = $('#menu-btn');
-  const menuScrim = $('#menuScrim');
+  const menuBtn  = $('#menu-btn');
+  const scrim    = $('#menuScrim');
 
+  // Abrir: quita hidden antes de animar
   menuBtn.addEventListener('click', () => {
-    sideMenu.classList.add('active');
-    menuScrim.classList.add('active');
-  }, { once:false });
+    sideMenu.hidden = false;
+    scrim.hidden = false;
 
-  menuScrim.addEventListener('click', () => {
+    sideMenu.classList.add('active');
+    scrim.classList.add('active');
+
+    menuBtn.setAttribute('aria-expanded','true');
+    sideMenu.setAttribute('aria-hidden','false');
+    scrim.setAttribute('aria-hidden','false');
+  });
+
+  // Cerrar con click en scrim
+  const closeMenu = () => {
     sideMenu.classList.remove('active');
-    menuScrim.classList.remove('active');
-  }, { once:false });
+    scrim.classList.remove('active');
+    menuBtn.setAttribute('aria-expanded','false');
+    sideMenu.setAttribute('aria-hidden','true');
+    scrim.setAttribute('aria-hidden','true');
+    // Espera transición y vuelve a ocultar del flujo
+    setTimeout(() => {
+      sideMenu.hidden = true;
+      scrim.hidden = true;
+    }, 280);
+  };
+  scrim.addEventListener('click', closeMenu);
 
   // Tabs
   const tabButtons = $$('.tab-btn');
@@ -54,7 +70,6 @@ function wireUI(){
       btn.classList.add('active');
       document.getElementById(btn.dataset.tab).classList.add('active');
 
-      // Si se cambia hacia la pestaña con mapa, forzar resize
       if (btn.dataset.tab === 'pendientes' && MAP_READY) {
         setTimeout(() => google.maps.event.trigger(map, 'resize'), 120);
       }
@@ -67,42 +82,35 @@ function wireUI(){
     catch { alert('Error al cerrar sesión'); }
   });
 
-  // FAB → modal de tipo (Cajeros/Oficinas)
-  const typeModal = $('#type-modal');
-  $('#add-fab').addEventListener('click', openTypeModal);
-  $('#type-cancel').addEventListener('click', closeTypeModal);
-  typeModal.addEventListener('click', e => { if (e.target === typeModal) closeTypeModal(); });
+  // Modal “tipo”
+  const modal = $('#type-modal');
+  const openModal = () => { modal.hidden = false; modal.classList.add('active'); modal.setAttribute('aria-hidden','false'); };
+  const closeModal = () => { modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); setTimeout(()=> modal.hidden=true, 150); };
+  $('#add-fab').addEventListener('click', openModal);
+  $('#type-cancel').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   $('#type-go').addEventListener('click', () => {
     const v = $('#tipo-destino').value;
     if (!v) { alert('Selecciona una opción'); return; }
-    if (v === 'CAJEROS') window.location.href = 'formulariocaj.html';
-    else window.location.href = 'formularioof.html';
+    closeModal();
+    if (v === 'CAJEROS') location.href = 'formulariocaj.html';
+    else location.href = 'formularioof.html';
   });
 
-  // Arranca el mapa si el script ya cargó
+  // Arrancar mapa si ya está el script
   if (window.google && window.google.maps && !MAP_READY) initMap();
+
+  // Habilitar GPS con gesto del usuario
+  $('#gps-btn').addEventListener('click', startGeoOnce, { once:true });
+  document.addEventListener('pointerdown', startGeoOnce, { once:true });
 }
 
-// Modal helpers
-function openTypeModal(){
-  $('#tipo-destino').value = '';
-  const m = $('#type-modal');
-  m.classList.add('active');
-  m.setAttribute('aria-hidden','false');
-}
-function closeTypeModal(){
-  const m = $('#type-modal');
-  m.classList.remove('active');
-  m.setAttribute('aria-hidden','true');
-}
-
-// ===== Carga de tareas (sin recargar la página) =====
+// ===== Datos dummy =====
 function loadCompletadas(userEmail){
   const cont = $('#completados-container');
   cont.innerHTML = '';
   d.collection('tareas')
-    .where('userEmail','==',userEmail)
-    .where('estado','==','completado')
+    .where('userEmail','==',userEmail).where('estado','==','completado')
     .get()
     .then(q=>{
       if (q.empty){ cont.innerHTML = '<p>No hay tareas completadas.</p>'; return; }
@@ -110,7 +118,6 @@ function loadCompletadas(userEmail){
     })
     .catch(err => console.error('Completados:', err));
 }
-
 function cardCompletada(t){
   const div = document.createElement('div');
   div.className = 'tarea-card';
@@ -125,13 +132,11 @@ function cardCompletada(t){
     </div>`;
   return div;
 }
-
 function loadIniciadas(userEmail){
   const cont = $('#iniciados');
   cont.innerHTML = '<h2>Tareas Iniciadas</h2>';
   d.collection('tareas')
-    .where('userEmail','==',userEmail)
-    .where('estado','==','pendiente')
+    .where('userEmail','==',userEmail).where('estado','==','pendiente')
     .get()
     .then(q=>{
       if (q.empty){ cont.insertAdjacentHTML('beforeend','<p>No hay tareas iniciadas.</p>'); return; }
@@ -139,7 +144,6 @@ function loadIniciadas(userEmail){
     })
     .catch(err => console.error('Iniciadas:', err));
 }
-
 function cardPendiente(t){
   const div = document.createElement('div');
   div.className = 'tarea-card';
@@ -153,56 +157,49 @@ function cardPendiente(t){
       <button class="btn-check" title="Marcar como completado">✔</button>
       <button class="btn-location" title="Ver ubicación">📍</button>
     </div>`;
-
-  // Completar SIN reload
   div.querySelector('.btn-check').addEventListener('click', async () => {
     try{
       await d.collection('tareas').doc(t.id).update({ estado:'completado' });
-      // mueve la tarjeta a Completados
       div.remove();
       $('#completados-container').appendChild(cardCompletada(t));
     }catch(e){ console.error(e); alert('No se pudo completar la tarea.'); }
   });
-
-  // Ubicación simple
   div.querySelector('.btn-location').addEventListener('click', () => {
     alert(`Ubicación: Lat ${t.latitudCliente}, Lng ${t.longitudCliente}`);
   });
-
   return div;
 }
 
-// ===== Google Maps (con guard para evitar múltiples inits) =====
+// ===== Google Maps =====
 function initMap(){
   if (MAP_READY) return;
   MAP_READY = true;
-
   const initialPosition = { lat: -12.0453, lng: -77.0311 };
   map = new google.maps.Map(document.getElementById('map'), { center: initialPosition, zoom: 15 });
   marker = new google.maps.Marker({ position: initialPosition, map, title:'Tu ubicación' });
-
-  // Forzar resize una vez pintado
   setTimeout(() => google.maps.event.trigger(map, 'resize'), 150);
-
-  // Geolocalización con watch único
-  if ('geolocation' in navigator){
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = navigator.geolocation.watchPosition(
-      p => {
-        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
-        marker.setPosition(pos);
-        map.setCenter(pos);
-      },
-      err => console.warn('GPS:', err.message),
-      { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
-    );
-  }else{
-    alert('Tu navegador no soporta geolocalización.');
-  }
 }
-window.initMap = initMap; // callback del script de Google
+window.initMap = initMap;
 
-// Limpieza al salir
+// Geolocalización solo tras gesto
+function startGeoOnce(){
+  if (GEO_WIRED) return;
+  GEO_WIRED = true;
+  if (!('geolocation' in navigator)) return alert('Tu navegador no soporta geolocalización.');
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(
+    p => {
+      const pos = { lat:p.coords.latitude, lng:p.coords.longitude };
+      if (!marker) return;
+      marker.setPosition(pos);
+      map.setCenter(pos);
+    },
+    err => console.warn('GPS:', err.message),
+    { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
+  );
+}
+
+// Limpieza
 window.addEventListener('beforeunload', () => {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 });

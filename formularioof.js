@@ -18,6 +18,7 @@ function hideOverlay(){ $('#overlay').classList.remove('active'); }
 // Estado
 let OFFICES = [];
 let map, meMarker, ofiMarker, geocoder, watchId = null;
+let GEO_WIRED = false;
 
 // ===== Inicio =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -37,6 +38,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#sel-cat').addEventListener('change', onCategoriaChange);
   $('#sel-motivo').addEventListener('change', onMotivoChange);
   $('#sel-nov').addEventListener('change', onNovedadChange);
+
+  // GPS sólo tras gesto
+  $('#btn-gps-ofi').addEventListener('click', startGeoOnce, { once:true });
+  document.addEventListener('pointerdown', startGeoOnce, { once:true });
 });
 
 // =================== OFICINAS ===================
@@ -77,12 +82,12 @@ function wireSearch(){
 
 function applyOffice(ofi){
   const dta = ofi.data||{};
-  // SIEMPRE llenar los campos
   $('#of-search').value  = ofi.id;
   $('#of-name').value    = ofi.id || '';
   $('#of-codigo').value  = dta.CODIGO || '';
   $('#of-direccion').value = dta.DIRECCION || '';
   $('#of-distrito').value  = dta.DISTRITO || '';
+  '#of-site' in document ? $('#of-site').value = dta.SITE || '' : null;
   $('#of-site').value      = dta.SITE || '';
   $('#of-consola').value   = dta.CONSOLA || '';
   $('#of-moto-save').value = dta['MOTO SAVE'] || '';
@@ -90,7 +95,7 @@ function applyOffice(ofi){
   $('#of-turbina').value   = dta['TURBINA'] || '';
   $('#of-status').value    = dta['STATUS DE FUNCIONAMIENTO'] || '';
 
-  // Geocodificar solo si Google Maps ya cargó
+  // Geocodificar si Maps ya cargó
   if (typeof google !== 'undefined' && google.maps) {
     const addr = [dta.DIRECCION, dta.DISTRITO, 'Perú'].filter(Boolean).join(', ');
     geocoder.geocode({ address: addr }, (results, status)=>{
@@ -105,8 +110,7 @@ function applyOffice(ofi){
 }
 
 // =================== CATEGORÍAS / MOTIVOS / NOVEDADES ===================
-
-// Mapeo explícito de subcolecciones conocidas
+// Mapeo explícito + heurística para nombres de subcolecciones
 const SUB_MAP = {
   "ATM'S":        ['RONDA_ATM','RONDA_ATMS'],
   'OFICINAS':     ['RONDA_OF','RONDA_OFI','RONDA_OFICINAS'],
@@ -118,7 +122,6 @@ const SUB_MAP = {
   'TACTICO':      ['RONDA_TA','RONDA_TC','RONDA_TK'],
   'VEHICULO':     ['RONDA_VE','RONDA_VH','RONDA_VEH']
 };
-
 function buildCandidates(cat){
   const up = normU(cat);
   const words = up.replace(/[^A-Z0-9 ]/g,' ').trim().split(/\s+/).filter(Boolean);
@@ -134,7 +137,6 @@ function buildCandidates(cat){
   (SUB_MAP[up]||[]).forEach(x => out.add(x));
   return Array.from(out);
 }
-
 async function loadCategorias(){
   const sel = $('#sel-cat');
   sel.innerHTML = '<option value="">Seleccionar…</option>';
@@ -143,9 +145,8 @@ async function loadCategorias(){
     snap.forEach(doc => { if(!doc.id.startsWith('__')) sel.insertAdjacentHTML('beforeend', `<option value="${doc.id}">${doc.id}</option>`); });
   }catch(e){ console.error('CATEGORIA:', e); }
 }
-
 async function getMotivosForCategoria(cat){
-  // 1) Si hay índice opcional: CATEGORIA/{cat}/__index__/subcollections { names:[...] }
+  // 1) índice opcional CATEGORIA/{cat}/__index__/subcollections { names:[...] }
   try{
     const idx = await d.doc(`CATEGORIA/${cat}/__index__/subcollections`).get();
     if (idx.exists){
@@ -153,8 +154,7 @@ async function getMotivosForCategoria(cat){
       if (names.length) return names;
     }
   }catch{}
-
-  // 2) Probar candidatos consultando .limit(1)
+  // 2) probar candidatos con .limit(1)
   const candidates = buildCandidates(cat);
   const found = [];
   for (const name of [...new Set(candidates)].slice(0,40)){
@@ -165,7 +165,6 @@ async function getMotivosForCategoria(cat){
   }
   return [...new Set(found)];
 }
-
 async function onCategoriaChange(){
   const cat = $('#sel-cat').value;
   const selMotivo = $('#sel-motivo'), selNovedad = $('#sel-nov'), selDetalle = $('#sel-detalle');
@@ -185,7 +184,6 @@ async function onCategoriaChange(){
   selMotivo.innerHTML = '<option value="">Seleccionar…</option>';
   motivos.forEach(m => selMotivo.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`));
 }
-
 async function onMotivoChange(){
   const cat = $('#sel-cat').value, mot = $('#sel-motivo').value;
   const selNovedad = $('#sel-nov'), selDetalle = $('#sel-detalle');
@@ -204,7 +202,6 @@ async function onMotivoChange(){
   }catch(e){ console.error(e); selNovedad.innerHTML = '<option value="">Error</option>'; }
   hideOverlay();
 }
-
 async function onNovedadChange(){
   const cat = $('#sel-cat').value, mot = $('#sel-motivo').value, nov = $('#sel-nov').value;
   const selDetalle = $('#sel-detalle'); selDetalle.innerHTML = '<option value="">Cargando…</option>';
@@ -253,10 +250,16 @@ function initMapInternal(){
   map = new google.maps.Map(document.getElementById('map-ofi'), { center: initial, zoom: 13 });
   geocoder = new google.maps.Geocoder();
   setTimeout(()=> google.maps.event.trigger(map, 'resize'), 150);
-  initUserWatch();
 }
 function initMapOfi(){ initMapInternal(); }
 window.initMapOfi = initMapOfi;
+
+// GPS sólo tras gesto
+function startGeoOnce(){
+  if (GEO_WIRED) return;
+  GEO_WIRED = true;
+  initUserWatch();
+}
 
 // =================== Cámara ===================
 function wireCamera(){

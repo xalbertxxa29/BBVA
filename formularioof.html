@@ -109,6 +109,9 @@
       <h2 style="margin:0 0 8px;">Mapa</h2>
       <p style="margin:0 0 12px; color:#333">Se muestra tu ubicación y la ubicación estimada de la oficina (geocodificada en Perú).</p>
       <div id="map-ofi"></div>
+      <div style="margin-top:10px;">
+        <button id="btn-gps-ofi" class="btn btn-ghost">Habilitar GPS</button>
+      </div>
     </section>
   </main>
 
@@ -122,7 +125,7 @@
   <!-- Lógica -->
   <script src="formularioof.js"></script>
 
-  <!-- Google Maps: importante el callback correcto -->
+  <!-- Google Maps -->
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMapOfi"></script>
 </body>
 </html>
