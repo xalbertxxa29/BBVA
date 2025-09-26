@@ -1,22 +1,24 @@
+// Contenido corregido para service-worker.js
 const CACHE_NAME = 'lidercontrol-cache-v2';
 const urlsToCache = [
   './',
   './index.html',
   './menu.html',
-  './formulario.html',
+  './formulariocaj.html', // Agregado
+  './formularioof.html',  // Agregado
   './styles.css',
   './menu.css',
-  './formulario.css',
+  './script.js', // Corregido el nombre del archivo
   './menu.js',
-  './formulario.js',
-  './app.js',
-  './script.js',
+  './formulariocaj.js', // Agregado
+  './formularioof.js',  // Agregado
+  './firebase-config.js', // Agregado para que la config esté offline
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
+  // Asegúrate de que los archivos 'formulario.html', '.css', '.js' no estén si no los usas.
 ];
 
-// Al instalar el Service Worker, se cachean los archivos especificados
 self.addEventListener('install', event => {
   console.log('Service Worker: Instalando...');
   event.waitUntil(
@@ -27,31 +29,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// Estrategia "Stale-While-Revalidate" para servir recursos
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.match(event.request).then(response => {
-        const fetchPromise = fetch(event.request)
-          .then(networkResponse => {
-            // Actualiza el recurso en caché con la versión más reciente de la red
-            cache.put(event.request, networkResponse.clone());
-            return networkResponse;
-          })
-          .catch(() => {
-            // Si falla la red y no está cacheado, devolver un recurso alternativo
-            if (event.request.mode === 'navigate') {
-              return caches.match('./index.html');
-            }
-          });
-        // Devuelve la respuesta cacheada o la promesa de red
-        return response || fetchPromise;
-      });
-    })
-  );
-});
-
-// Activación del Service Worker y limpieza de cachés antiguos
 self.addEventListener('activate', event => {
   console.log('Service Worker: Activando...');
   const cacheWhitelist = [CACHE_NAME];
@@ -69,18 +46,28 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Manejo de errores y recursos faltantes
+// Listener 'fetch' ÚNICO Y CORREGIDO
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return (
-        response ||
-        fetch(event.request).catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('./index.html'); // Devuelve la página inicial en caso de error
-          }
-        })
-      );
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.match(event.request).then(cachedResponse => {
+        const fetchPromise = fetch(event.request).then(networkResponse => {
+          // Si la petición a la red es exitosa, la guardamos en caché.
+          cache.put(event.request, networkResponse.clone());
+          return networkResponse;
+        });
+
+        // Devolvemos la respuesta cacheada inmediatamente si existe,
+        // mientras en segundo plano se actualiza desde la red.
+        // Si no hay nada en caché, esperamos a la respuesta de la red.
+        return cachedResponse || fetchPromise;
+      }).catch(() => {
+        // Si todo falla (ni caché ni red), para peticiones de navegación,
+        // devolvemos el index.html como fallback.
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
     })
   );
 });

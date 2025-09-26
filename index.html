@@ -5,15 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>LiderControl — Iniciar sesión</title>
+  <link rel="icon" href="favicon.ico" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="lc-login">
-  <!-- Overlay / Loader global -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
+
+  <!-- Overlay moderno -->
   <div id="overlay" class="overlay" aria-hidden="true">
-    <div class="neo-overlay"></div>
-    <div class="loader">
-      <div class="spinner"></div>
-      <p id="overlay-msg">Conectando…</p>
+    <div class="glass-loader">
+      <div class="glass-card">
+        <div class="loader-ring">
+          <span class="ring r1"></span>
+          <span class="ring r2"></span>
+          <span class="logo"><img src="icon-192.png" alt="LiderControl"></span>
+        </div>
+        <div class="loader-title" id="overlay-msg">Conectando…</div>
+        <div class="progress-bar"><div class="progress-fill" id="overlay-progress"></div></div>
+        <p class="loader-sub" id="overlay-sub">Verificando credenciales</p>
+      </div>
     </div>
   </div>
 
@@ -32,7 +49,7 @@
       <label for="password">Contraseña</label>
       <input type="password" id="password" autocomplete="current-password" placeholder="Tu contraseña" required />
 
-      <button id="login-btn" class="btn btn-danger btn-lg" aria-label="Iniciar sesión">Iniciar sesión</button>
+      <button id="login-btn" class="btn btn-danger btn-lg">Iniciar sesión</button>
 
       <div class="links">
         <button id="forgot-password" class="link" type="button">¿Olvidaste tu contraseña?</button>
@@ -45,16 +62,14 @@
     </footer>
   </main>
 
-  <!-- Firebase SDKs -->
+  <!-- Firebase compat + config -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
-
-  <!-- Configuración separada -->
   <script src="firebase-config.js"></script>
 
-  <!-- Lógica del login + overlay -->
   <script src="script.js"></script>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
 </body>
 </html>

@@ -1,34 +1,114 @@
-// Usa auth y db de firebase-config.js
+// ===== Firebase (Compat) expuesto por firebase-config.js =====
 const a = window.auth;
 const d = window.db;
 
-let map, marker;
+// ===== Guards globales para evitar dobles inits =====
+let MAP_READY = false;
+let map, marker, watchId = null;
+let LISTENERS_WIRED = false;
 
-// Guard de sesión + datos de usuario
+// ===== Helpers =====
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// ===== Auth guard y carga inicial =====
 a.onAuthStateChanged(user => {
   if (!user) { window.location.href = 'index.html'; return; }
-  document.getElementById('fecha').innerText = new Date().toLocaleDateString();
-  document.getElementById('user-name').innerText = user.displayName || 'Usuario';
-  document.getElementById('user-email').innerText = user.email;
-  cargarTareasIniciadas(user.email);
-  cargarTareasCompletadas(user.email);
+  // Header
+  $('#fecha').textContent = new Date().toLocaleDateString();
+  $('#user-name').textContent = user.displayName || 'Usuario';
+  $('#user-email').textContent = user.email;
+
+  // Evitar volver a cablear listeners si el SDK re-emite el estado
+  if (!LISTENERS_WIRED) wireUI();
+  loadIniciadas(user.email);
+  loadCompletadas(user.email);
 });
 
-// ===== Carga de tareas =====
-function cargarTareasCompletadas(userEmail){
-  const cont = document.getElementById('completados-container');
+// ===== UI wiring (solo una vez) =====
+function wireUI(){
+  LISTENERS_WIRED = true;
+
+  // Menú lateral
+  const sideMenu = $('#side-menu');
+  const menuBtn = $('#menu-btn');
+  const menuScrim = $('#menuScrim');
+
+  menuBtn.addEventListener('click', () => {
+    sideMenu.classList.add('active');
+    menuScrim.classList.add('active');
+  }, { once:false });
+
+  menuScrim.addEventListener('click', () => {
+    sideMenu.classList.remove('active');
+    menuScrim.classList.remove('active');
+  }, { once:false });
+
+  // Tabs
+  const tabButtons = $$('.tab-btn');
+  const tabContents = $$('.tab-content');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      tabContents.forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+
+      // Si se cambia hacia la pestaña con mapa, forzar resize
+      if (btn.dataset.tab === 'pendientes' && MAP_READY) {
+        setTimeout(() => google.maps.event.trigger(map, 'resize'), 120);
+      }
+    });
+  });
+
+  // Logout
+  $('#logout-btn').addEventListener('click', async () => {
+    try { await a.signOut(); location.href = 'index.html'; }
+    catch { alert('Error al cerrar sesión'); }
+  });
+
+  // FAB → modal de tipo (Cajeros/Oficinas)
+  const typeModal = $('#type-modal');
+  $('#add-fab').addEventListener('click', openTypeModal);
+  $('#type-cancel').addEventListener('click', closeTypeModal);
+  typeModal.addEventListener('click', e => { if (e.target === typeModal) closeTypeModal(); });
+  $('#type-go').addEventListener('click', () => {
+    const v = $('#tipo-destino').value;
+    if (!v) { alert('Selecciona una opción'); return; }
+    if (v === 'CAJEROS') window.location.href = 'formulariocaj.html';
+    else window.location.href = 'formularioof.html';
+  });
+
+  // Arranca el mapa si el script ya cargó
+  if (window.google && window.google.maps && !MAP_READY) initMap();
+}
+
+// Modal helpers
+function openTypeModal(){
+  $('#tipo-destino').value = '';
+  const m = $('#type-modal');
+  m.classList.add('active');
+  m.setAttribute('aria-hidden','false');
+}
+function closeTypeModal(){
+  const m = $('#type-modal');
+  m.classList.remove('active');
+  m.setAttribute('aria-hidden','true');
+}
+
+// ===== Carga de tareas (sin recargar la página) =====
+function loadCompletadas(userEmail){
+  const cont = $('#completados-container');
   cont.innerHTML = '';
   d.collection('tareas')
-    .where('userEmail','==',userEmail).where('estado','==','completado')
+    .where('userEmail','==',userEmail)
+    .where('estado','==','completado')
     .get()
     .then(q=>{
       if (q.empty){ cont.innerHTML = '<p>No hay tareas completadas.</p>'; return; }
-      q.forEach(doc=>{
-        const t = { id:doc.id, ...doc.data() };
-        cont.appendChild(cardCompletada(t));
-      });
+      q.forEach(doc => cont.appendChild(cardCompletada({ id:doc.id, ...doc.data() })));
     })
-    .catch(err=> console.error('Completados:', err));
+    .catch(err => console.error('Completados:', err));
 }
 
 function cardCompletada(t){
@@ -46,20 +126,18 @@ function cardCompletada(t){
   return div;
 }
 
-function cargarTareasIniciadas(userEmail){
-  const cont = document.getElementById('iniciados');
+function loadIniciadas(userEmail){
+  const cont = $('#iniciados');
   cont.innerHTML = '<h2>Tareas Iniciadas</h2>';
   d.collection('tareas')
-    .where('userEmail','==',userEmail).where('estado','==','pendiente')
+    .where('userEmail','==',userEmail)
+    .where('estado','==','pendiente')
     .get()
     .then(q=>{
       if (q.empty){ cont.insertAdjacentHTML('beforeend','<p>No hay tareas iniciadas.</p>'); return; }
-      q.forEach(doc=>{
-        const t = { id:doc.id, ...doc.data() };
-        cont.appendChild(cardPendiente(t));
-      });
+      q.forEach(doc => cont.appendChild(cardPendiente({ id:doc.id, ...doc.data() })));
     })
-    .catch(err=> console.error('Iniciadas:', err));
+    .catch(err => console.error('Iniciadas:', err));
 }
 
 function cardPendiente(t){
@@ -75,89 +153,56 @@ function cardPendiente(t){
       <button class="btn-check" title="Marcar como completado">✔</button>
       <button class="btn-location" title="Ver ubicación">📍</button>
     </div>`;
-  div.querySelector('.btn-check').addEventListener('click',()=> marcarCompletada(t.id));
-  div.querySelector('.btn-location').addEventListener('click',()=>{
+
+  // Completar SIN reload
+  div.querySelector('.btn-check').addEventListener('click', async () => {
+    try{
+      await d.collection('tareas').doc(t.id).update({ estado:'completado' });
+      // mueve la tarjeta a Completados
+      div.remove();
+      $('#completados-container').appendChild(cardCompletada(t));
+    }catch(e){ console.error(e); alert('No se pudo completar la tarea.'); }
+  });
+
+  // Ubicación simple
+  div.querySelector('.btn-location').addEventListener('click', () => {
     alert(`Ubicación: Lat ${t.latitudCliente}, Lng ${t.longitudCliente}`);
   });
+
   return div;
 }
 
-async function marcarCompletada(id){
-  try{
-    await d.collection('tareas').doc(id).update({ estado:'completado' });
-    location.reload();
-  }catch(e){ console.error(e); alert('No se pudo completar la tarea.'); }
-}
-
-// ===== Sesión =====
-document.getElementById('logout-btn').addEventListener('click', async ()=>{
-  try{ await a.signOut(); location.href='index.html'; }catch(e){ alert('Error al cerrar sesión'); }
-});
-
-// ===== Menú lateral + overlay =====
-const menuBtn = document.getElementById('menu-btn');
-const sideMenu = document.getElementById('side-menu');
-const globalOverlay = document.getElementById('globalOverlay');
-
-menuBtn.addEventListener('click', ()=>{
-  sideMenu.classList.toggle('active');
-  globalOverlay.classList.toggle('active');
-});
-globalOverlay.addEventListener('click', ()=>{
-  sideMenu.classList.remove('active');
-  globalOverlay.classList.remove('active');
-  closeModal();
-});
-
-// ===== Tabs =====
-const tabButtons = document.querySelectorAll('.tab-btn');
-const tabContents = document.querySelectorAll('.tab-content');
-tabButtons.forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    tabButtons.forEach(b=>b.classList.remove('active'));
-    tabContents.forEach(c=>c.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(btn.dataset.tab).classList.add('active');
-  });
-});
-
-// ===== FAB + Modal =====
-const fabContainer = document.querySelector('.fab-container');
-const mainFab = document.getElementById('main-fab');
-const modal = document.getElementById('modal');
-const addFab = document.getElementById('add-fab');
-const closeModalBtn = document.getElementById('close-modal');
-
-mainFab.addEventListener('click', ()=> fabContainer.classList.toggle('open'));
-addFab.addEventListener('click', ()=> openModal());
-closeModalBtn.addEventListener('click', ()=> closeModal());
-
-function openModal(){ modal.classList.add('active'); modal.setAttribute('aria-hidden','false'); }
-function closeModal(){ modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); }
-
-// Ir a formulario con el tipo guardado
-modal.querySelectorAll('[data-tipo]').forEach(b=>{
-  b.addEventListener('click',()=>{
-    const tipoDeTarea = b.getAttribute('data-tipo');
-    localStorage.setItem('tipoDeTarea', tipoDeTarea);
-    window.location.href = 'formulario.html';
-  });
-});
-
-// ===== Google Maps (mapa principal) =====
+// ===== Google Maps (con guard para evitar múltiples inits) =====
 function initMap(){
-  const initialPosition = { lat: -12.0453, lng: -77.0311 };
-  map = new google.maps.Map(document.getElementById('map'),{ center:initialPosition, zoom:15 });
-  marker = new google.maps.Marker({ position:initialPosition, map, title:'Tu ubicación' });
-  trackUserLocation(pos=>{ marker.setPosition(pos); map.setCenter(pos); });
-}
-window.initMap = initMap; // callback del script de Maps
+  if (MAP_READY) return;
+  MAP_READY = true;
 
-function trackUserLocation(cb){
-  if(!navigator.geolocation){ alert('Tu navegador no soporta geolocalización.'); return; }
-  navigator.geolocation.watchPosition(
-    p=> cb({ lat:p.coords.latitude, lng:p.coords.longitude }),
-    e=> console.error(e),
-    { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
-  );
+  const initialPosition = { lat: -12.0453, lng: -77.0311 };
+  map = new google.maps.Map(document.getElementById('map'), { center: initialPosition, zoom: 15 });
+  marker = new google.maps.Marker({ position: initialPosition, map, title:'Tu ubicación' });
+
+  // Forzar resize una vez pintado
+  setTimeout(() => google.maps.event.trigger(map, 'resize'), 150);
+
+  // Geolocalización con watch único
+  if ('geolocation' in navigator){
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = navigator.geolocation.watchPosition(
+      p => {
+        const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+        marker.setPosition(pos);
+        map.setCenter(pos);
+      },
+      err => console.warn('GPS:', err.message),
+      { enableHighAccuracy:true, maximumAge:0, timeout:10000 }
+    );
+  }else{
+    alert('Tu navegador no soporta geolocalización.');
+  }
 }
+window.initMap = initMap; // callback del script de Google
+
+// Limpieza al salir
+window.addEventListener('beforeunload', () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+});

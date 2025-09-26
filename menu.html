@@ -5,9 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Mis Tareas</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.ico" />
 </head>
 <body>
-  <div class="overlay" id="globalOverlay"><div class="neo-overlay"></div></div>
+  <!-- Limpieza de cualquier Service Worker previo (no PWA) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
+
+  <!-- SCRIM detrás del menú (no bloquea el menú) -->
+  <div id="menuScrim" class="scrim" aria-hidden="true"></div>
 
   <header class="header">
     <div class="title">
@@ -23,7 +35,7 @@
       <p id="user-email"></p>
     </div>
     <ul>
-      <li><a href="#">Mis Tareas</a></li>
+      <li><a href="menu.html">Mis Tareas</a></li>
       <li><a href="#">Tareas Rechazadas</a></li>
       <li><a href="#">Mapa de Tareas</a></li>
       <li><a href="#">Historial</a></li>
@@ -53,7 +65,6 @@
 
     <section id="iniciados" class="tab-content">
       <h2>Tareas Iniciadas</h2>
-      <!-- tarjetas dinámicas aquí -->
     </section>
 
     <section id="completados" class="tab-content">
@@ -61,40 +72,48 @@
       <div id="completados-container"></div>
     </section>
 
+    <!-- FAB (nuevo: + abre modal de tipo) -->
     <div class="fab-container">
-      <button class="fab" id="main-fab" aria-label="Abrir acciones">⋮</button>
-      <div class="fab-options" id="fab-options">
-        <button class="fab" id="add-fab" aria-label="Nueva tarea">＋</button>
-      </div>
-    </div>
-
-    <!-- Modal simple usando el overlay global -->
-    <div id="modal" class="overlay" aria-hidden="true">
-      <div class="neo-overlay"></div>
-      <div class="card" style="position:fixed; inset:auto 12px 12px 12px; max-width:640px; margin:0 auto; padding:18px; z-index:1001;">
-        <button class="btn btn-ghost" id="close-modal" style="float:right">✕</button>
-        <h1 style="margin-top:0">Formulario</h1>
-        <p>Selecciona un formulario para comenzar la tarea.</p>
-        <div class="modal-options" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <button class="btn" data-tipo="Unidades Armadas">UNIDADES ARMADAS</button>
-          <button class="btn" data-tipo="Encuesta de Satisfacción">ENCUESTA DE SATISFACCIÓN</button>
-          <button class="btn" data-tipo="Ronda de la Unidad">RONDA DE LA UNIDAD</button>
-          <button class="btn" data-tipo="Formulario Dinámico">RONDA (FORM DINÁMICO)</button>
-          <button class="btn" data-tipo="Resguardos">RESGUARDOS</button>
-        </div>
-      </div>
+      <button class="fab" id="add-fab" aria-label="Nueva tarea">＋</button>
+      <button class="fab" id="main-fab" aria-label="Más acciones">⋮</button>
     </div>
   </main>
 
-  <!-- Firebase SDKs y config separada -->
+  <!-- MODAL moderno: selección de destino -->
+  <div id="type-modal" class="overlay" aria-hidden="true">
+    <div class="neo-overlay"></div>
+    <div class="dialog glass-card">
+      <div class="dialog-header">
+        <img src="icon-192.png" alt="LiderControl" class="dialog-logo" />
+        <h2>Nuevo formulario</h2>
+      </div>
+      <p>Selecciona el destino para continuar.</p>
+      <div class="form-row">
+        <label for="tipo-destino" class="sr-only">Destino</label>
+        <select id="tipo-destino" class="input">
+          <option value="">Seleccionar…</option>
+          <option value="CAJEROS">CAJEROS</option>
+          <option value="OFICINAS">OFICINAS</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button id="type-cancel" class="btn btn-ghost">Cancelar</button>
+        <button id="type-go" class="btn btn-danger">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase (Compat) + config separada (VARIANTE A) -->
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
   <script src="firebase-config.js"></script>
 
+  <!-- Lógica del menú con guards anti-bucle -->
   <script src="menu.js"></script>
-  <!-- Reemplaza por tu clave de Maps -->
+
+  <!-- Google Maps (usa window.initMap de menu.js) -->
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMap"></script>
 </body>
 </html>

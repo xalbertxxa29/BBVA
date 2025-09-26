@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Oficinas — Selección y Mapa</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .search-wrap{ position:relative; }
+    .search-input{ width:100%; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:#fff; color:var(--fg); }
+    .search-input:focus{ outline:none; border-color:var(--danger); box-shadow:0 0 0 4px var(--danger-3); }
+    .suggest{ position:absolute; left:0; right:0; top:100%; margin-top:6px; background:#fff; border:1px solid var(--border);
+      border-radius:12px; box-shadow:var(--shadow); max-height:260px; overflow:auto; z-index:10; display:none; }
+    .suggest.show{ display:block; }
+    .suggest-item{ padding:10px 12px; cursor:pointer; display:flex; flex-direction:column; gap:4px; }
+    .suggest-item:hover{ background:var(--danger-3); }
+    .suggest-title{ font-weight:800; }
+    .suggest-sub{ font-size:12px; color:#333; }
+    .data-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width:600px){ .data-grid{ grid-template-columns:1fr; } }
+    #map-ofi{ width:100%; height:360px; border:1px solid var(--border); border-radius:12px; }
+    .preview{ margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; }
+    .preview img{ width:120px; height:120px; object-fit:cover; border-radius:12px; border:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <!-- Overlay -->
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="glass-loader">
+      <div class="glass-card">
+        <div class="loader-ring">
+          <span class="ring r1"></span><span class="ring r2"></span>
+          <span class="logo"><img src="icon-192.png" alt="LiderControl"></span>
+        </div>
+        <div class="loader-title" id="overlay-msg">Cargando…</div>
+        <div class="progress-bar"><div class="progress-fill" id="overlay-progress"></div></div>
+        <p class="loader-sub" id="overlay-sub">Conectando con la base de datos</p>
+      </div>
+    </div>
+  </div>
+
+  <main class="auth-shell" style="grid-template-rows:auto auto 1fr; gap:16px;">
+    <header class="header" style="position:static;">
+      <div class="title"><h1 style="margin:0">Formulario</h1></div>
+      <p id="fecha" aria-live="polite"></p>
+    </header>
+
+    <section class="card" style="max-width:980px; margin:0 auto; padding:18px;">
+      <h2 style="margin:0 0 8px;">Selecciona una oficina</h2>
+      <p style="margin:0 0 12px; color:#333">Busca por nombre de documento, dirección o distrito.</p>
+
+      <div class="search-wrap">
+        <input id="of-search" class="search-input" placeholder="Buscar oficina… (ej. REPUBLICA DE PANAMA, SAN ISIDRO)" autocomplete="off" />
+        <div id="of-suggest" class="suggest" role="listbox" aria-label="Sugerencias"></div>
+      </div>
+
+      <div style="height:12px"></div>
+
+      <div class="data-grid">
+        <div class="form-group"><label for="of-name">Oficina (doc id)</label><input id="of-name" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-codigo">CODIGO</label><input id="of-codigo" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-direccion">DIRECCION</label><input id="of-direccion" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-distrito">DISTRITO</label><input id="of-distrito" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-site">SITE</label><input id="of-site" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-consola">CONSOLA</label><input id="of-consola" class="input" placeholder="—" disabled /></div>
+
+        <div class="form-group">
+          <label for="of-turno">TURNO</label>
+          <select id="of-turno" class="input">
+            <option value="">Seleccionar…</option>
+            <option value="MAÑANA">MAÑANA</option>
+            <option value="TARDE">TARDE</option>
+          </select>
+        </div>
+
+        <div class="form-group"><label for="of-moto-save">MOTO SAVE</label><input id="of-moto-save" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-motorizado">MOTORIZADO</label><input id="of-motorizado" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-turbina">TURBINA</label><input id="of-turbina" class="input" placeholder="—" disabled /></div>
+        <div class="form-group"><label for="of-status">STATUS DE FUNCIONAMIENTO</label><input id="of-status" class="input" placeholder="—" disabled /></div>
+      </div>
+    </section>
+
+    <section class="card" style="max-width:980px; margin:0 auto; padding:18px;">
+      <h2 style="margin:0 0 8px;">Clasificación</h2>
+      <div class="data-grid">
+        <div class="form-group"><label for="sel-cat">Seleccione Categoría</label><select id="sel-cat" class="input"></select></div>
+        <div class="form-group"><label for="sel-motivo">Seleccione Motivo</label><select id="sel-motivo" class="input"></select></div>
+        <div class="form-group"><label for="sel-nov">Seleccione Novedad</label><select id="sel-nov" class="input"></select></div>
+        <div class="form-group"><label for="sel-detalle">Detalle de Novedad</label><select id="sel-detalle" class="input"></select></div>
+
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="comentario">Agregar comentario</label>
+          <textarea id="comentario" class="input" rows="3" placeholder="Escribe tu comentario…"></textarea>
+        </div>
+
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Tomar foto</label>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button id="btn-foto" class="btn btn-danger" type="button">Abrir cámara</button>
+            <input id="inp-foto" type="file" accept="image/*" capture="environment" class="hidden" />
+          </div>
+          <div id="foto-preview" class="preview"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" style="max-width:980px; margin:0 auto; padding:18px;">
+      <h2 style="margin:0 0 8px;">Mapa</h2>
+      <p style="margin:0 0 12px; color:#333">Se muestra tu ubicación y la ubicación estimada de la oficina (geocodificada en Perú).</p>
+      <div id="map-ofi"></div>
+    </section>
+  </main>
+
+  <!-- Firebase compat + config -->
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <!-- Lógica -->
+  <script src="formularioof.js"></script>
+
+  <!-- Google Maps: importante el callback correcto -->
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDlOoCAxAvWK5kpBkmnefd5dC62ns8v1pU&callback=initMapOfi"></script>
+</body>
+</html>
